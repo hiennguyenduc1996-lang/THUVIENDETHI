@@ -21,15 +21,83 @@ import {
   Download
 } from 'lucide-react';
 
+// --- IndexedDB Helper ---
+const DB_NAME = 'ExamManagerDB';
+const DB_VERSION = 1;
+const STORE_NAME = 'files';
+
+const openDB = (): Promise<IDBDatabase> => {
+  return new Promise((resolve, reject) => {
+    if (typeof indexedDB === 'undefined') {
+        reject(new Error("IndexedDB not supported"));
+        return;
+    }
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onupgradeneeded = (event) => {
+      const db = (event.target as IDBOpenDBRequest).result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME);
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+};
+
+const saveFileContent = async (id: string, content: string) => {
+  try {
+    const db = await openDB();
+    return new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.put(content, id);
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    });
+  } catch (e) {
+    console.error("Failed to save to IndexedDB", e);
+  }
+};
+
+const getFileContent = async (id: string): Promise<string | undefined> => {
+  try {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.get(id);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  } catch (e) {
+    console.error("Failed to read from IndexedDB", e);
+    return undefined;
+  }
+};
+
+const deleteFileContent = async (id: string) => {
+  try {
+    const db = await openDB();
+    return new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.delete(id);
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    });
+  } catch (e) {
+    console.error("Failed to delete from IndexedDB", e);
+  }
+};
+
 // --- Types & Interfaces ---
 
 interface FileMeta {
   id: string;
   name: string;
-  // size?: string; // Removed size per request
   type: 'question' | 'answer';
   timestamp: number;
-  content?: string; // Base64 content for download
+  content?: string; // Optional in state, stored in IDB
 }
 
 interface FileRow {
@@ -76,10 +144,22 @@ const STORAGE_KEY = 'exam-manager-data-v1';
 
 const saveToStorage = (data: Shelf[]) => {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    // Strip content before saving to LocalStorage to avoid quota limits
+    const cleanData = data.map(shelf => ({
+      ...shelf,
+      topics: shelf.topics.map(topic => ({
+        ...topic,
+        files: topic.files.map(file => ({
+          ...file,
+          questionFile: file.questionFile ? { ...file.questionFile, content: undefined } : null,
+          answerFile: file.answerFile ? { ...file.answerFile, content: undefined } : null
+        }))
+      }))
+    }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(cleanData));
   } catch (e) {
     console.error("Storage quota exceeded", e);
-    // Don't alert constantly, maybe just log or show a toast if we had one
+    alert("Cảnh báo: Không thể lưu cấu trúc dữ liệu do bộ nhớ đầy. Hãy xóa bớt các mục cũ.");
   }
 };
 
@@ -129,8 +209,19 @@ const App = () => {
     setShelves(shelves.map(s => s.id === updatedShelf.id ? updatedShelf : s));
   };
 
-  const deleteShelf = (id: string) => {
+  const deleteShelf = async (id: string) => {
     if (window.confirm("Bạn có chắc muốn xóa ngăn này và toàn bộ dữ liệu bên trong?")) {
+      // Cleanup IDB
+      const shelfToDelete = shelves.find(s => s.id === id);
+      if (shelfToDelete) {
+        for (const topic of shelfToDelete.topics) {
+          for (const file of topic.files) {
+            if (file.questionFile) await deleteFileContent(file.questionFile.id);
+            if (file.answerFile) await deleteFileContent(file.answerFile.id);
+          }
+        }
+      }
+
       const newShelves = shelves.filter(s => s.id !== id);
       setShelves(newShelves);
       if (newShelves.length > 0) setActiveShelfId(newShelves[0].id);
@@ -327,8 +418,15 @@ const ShelfDetail = ({ shelf, onUpdate }: { shelf: Shelf, onUpdate: (s: Shelf) =
     onUpdate({ ...shelf, topics: newTopics });
   };
 
-  const deleteTopic = (topicId: string) => {
+  const deleteTopic = async (topicId: string) => {
     if (window.confirm("Xóa chủ đề này?")) {
+      const topicToDelete = shelf.topics.find(t => t.id === topicId);
+      if (topicToDelete) {
+        for (const file of topicToDelete.files) {
+          if (file.questionFile) await deleteFileContent(file.questionFile.id);
+          if (file.answerFile) await deleteFileContent(file.answerFile.id);
+        }
+      }
       onUpdate({ ...shelf, topics: shelf.topics.filter(t => t.id !== topicId) });
     }
   };
@@ -545,23 +643,30 @@ const FileSlot = ({
   onUpload: (f: File) => void,
   onRemove: () => void
 }) => {
-  const [dragOver, setDragOver] = useState(false);
+  // Removed drag state and handlers as per request to only use buttons/Ctrl+V for adding files.
+  
+  const handleDownload = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!file) return;
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(false);
-    if (e.dataTransfer.files?.[0]) {
-      onUpload(e.dataTransfer.files[0]);
+    let content = file.content;
+    
+    // If content is not in state (removed for storage optimization), fetch from IDB
+    if (!content) {
+       try {
+         content = await getFileContent(file.id);
+       } catch (err) {
+         console.error("Download error", err);
+       }
     }
-  };
 
-  const handleDownload = (e: React.MouseEvent) => {
-    if (!file || !file.content) {
-      if (file) alert("File này không có nội dung để tải (có thể do phiên làm việc trước chưa lưu nội dung).");
+    if (!content) {
+      alert("Không tìm thấy nội dung file. Có thể file đã bị lỗi hoặc đã bị xóa khỏi bộ nhớ.");
       return;
     }
+    
     const link = document.createElement('a');
-    link.href = file.content;
+    link.href = content;
     link.download = file.name;
     document.body.appendChild(link);
     link.click();
@@ -577,7 +682,6 @@ const FileSlot = ({
       >
         <span className="opacity-70">{icon}</span>
         <span className="truncate font-medium flex-1">{file.name}</span>
-        {/* Size removed per request */}
         <button 
           onClick={(e) => { e.stopPropagation(); onRemove(); }}
           className="p-1 hover:bg-black/10 rounded-full transition-colors"
@@ -590,10 +694,7 @@ const FileSlot = ({
 
   return (
     <label 
-      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-      onDragLeave={() => setDragOver(false)}
-      onDrop={handleDrop}
-      className={`flex items-center gap-2 p-2 rounded-lg border-2 border-dashed cursor-pointer transition-all h-[38px] ${dragOver ? 'border-blue-400 bg-blue-50' : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50 text-slate-400'}`}
+      className={`flex items-center gap-2 p-2 rounded-lg border-2 border-dashed cursor-pointer transition-all h-[38px] border-slate-200 hover:border-blue-300 hover:bg-slate-50 text-slate-400`}
     >
       <input type="file" className="hidden" onChange={(e) => e.target.files?.[0] && onUpload(e.target.files[0])} />
       <span className="opacity-50">{icon}</span>
@@ -603,24 +704,36 @@ const FileSlot = ({
 };
 
 const FileRowItem = ({ 
-  row, onUpdate, onDelete 
+  row, index, onUpdate, onDelete, onDragStart, onDrop, isDraggable 
 }: { 
   row: FileRow, 
+  index: number,
   onUpdate: (updates: Partial<FileRow>) => void, 
-  onDelete: () => void 
+  onDelete: () => void,
+  onDragStart: (e: React.DragEvent, id: string) => void,
+  onDrop: (e: React.DragEvent, id: string) => void,
+  isDraggable: boolean
 }) => {
+  const [isOver, setIsOver] = useState(false);
   
   const handleFileUpload = (type: 'question' | 'answer', file: File) => {
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       const content = e.target?.result as string;
+      const fileId = crypto.randomUUID();
+      
+      // Save content to IndexedDB
+      await saveFileContent(fileId, content);
+
       const fileMeta: FileMeta = {
-        id: crypto.randomUUID(),
+        id: fileId,
         name: file.name,
-        // size: (file.size / 1024).toFixed(1) + ' KB', // Removed
         type,
         timestamp: Date.now(),
-        content: content
+        // We can keep content in state for this session for speed, or set undefined.
+        // Setting undefined ensures consistent behavior with reload, but keeping it makes current session fast.
+        // Since we strip it in saveToStorage, it's safe to keep here for now.
+        content: undefined 
       };
       
       if (type === 'question') onUpdate({ questionFile: fileMeta });
@@ -629,8 +742,47 @@ const FileRowItem = ({
     reader.readAsDataURL(file);
   };
 
+  const handleDelete = async () => {
+    // Delete content from IDB
+    if (row.questionFile) await deleteFileContent(row.questionFile.id);
+    if (row.answerFile) await deleteFileContent(row.answerFile.id);
+    onDelete();
+  };
+
+  const handleRemoveFile = async (type: 'question' | 'answer') => {
+      if (type === 'question' && row.questionFile) {
+          await deleteFileContent(row.questionFile.id);
+          onUpdate({ questionFile: null });
+      } else if (type === 'answer' && row.answerFile) {
+          await deleteFileContent(row.answerFile.id);
+          onUpdate({ answerFile: null });
+      }
+  };
+
   return (
-    <div className={`group flex items-center gap-3 p-3 rounded-lg border transition-all ${row.isCompleted ? 'bg-slate-50 border-slate-100 opacity-75' : 'bg-white border-slate-200 hover:border-blue-300'}`}>
+    <div 
+      draggable={isDraggable}
+      onDragStart={(e) => onDragStart(e, row.id)}
+      onDragOver={(e) => { e.preventDefault(); if(isDraggable) setIsOver(true); }}
+      onDragLeave={() => setIsOver(false)}
+      onDrop={(e) => { e.preventDefault(); setIsOver(false); onDrop(e, row.id); }}
+      className={`group flex items-center gap-3 p-3 rounded-lg border transition-all 
+        ${isOver ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-100 z-10' : ''}
+        ${row.isCompleted ? 'bg-slate-50 border-slate-100 opacity-75' : 'bg-white border-slate-200 hover:border-blue-300'}
+      `}
+    >
+      {/* Auto Numbering & Grip */}
+      <div className={`flex items-center gap-2 ${isDraggable ? 'cursor-grab active:cursor-grabbing' : ''}`}>
+         {/* Grip Handle - Visible on Hover if Draggable */}
+         <div className={`text-slate-300 hover:text-slate-500 transition-opacity ${isDraggable ? 'opacity-0 group-hover:opacity-100' : 'hidden'}`}>
+             <GripVertical size={16} />
+         </div>
+
+         {/* Modern Number Badge */}
+         <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-slate-100 text-slate-600 font-bold text-xs shadow-inner shrink-0 group-hover:bg-blue-100 group-hover:text-blue-700 transition-colors select-none">
+            {index + 1}.
+         </div>
+      </div>
       
       {/* Checkbox */}
       <button 
@@ -647,7 +799,7 @@ const FileRowItem = ({
           placeholder="Đề bài" 
           icon={<FileText size={16} />}
           onUpload={(f) => handleFileUpload('question', f)}
-          onRemove={() => onUpdate({ questionFile: null })}
+          onRemove={() => handleRemoveFile('question')}
         />
       </div>
 
@@ -664,13 +816,13 @@ const FileRowItem = ({
           icon={<FileCheck size={16} />}
           isAnswer
           onUpload={(f) => handleFileUpload('answer', f)}
-          onRemove={() => onUpdate({ answerFile: null })}
+          onRemove={() => handleRemoveFile('answer')}
         />
       </div>
 
       {/* Actions */}
       <button 
-        onClick={onDelete}
+        onClick={handleDelete}
         className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100 transition-all"
         title="Xóa dòng"
       >
@@ -693,69 +845,99 @@ const TopicItem = ({
   onMoveDown: () => void,
 }) => {
   const [isEditingName, setIsEditingName] = useState(false);
-  const [dragOver, setDragOver] = useState(false);
 
   const totalFiles = topic.files.length;
   const completedFiles = topic.files.filter(f => f.isCompleted).length;
   const percent = totalFiles === 0 ? 0 : Math.round((completedFiles / totalFiles) * 100);
 
-  const handleFileDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(false);
-    
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const droppedFiles = Array.from(e.dataTransfer.files);
-      
-      // Async read of multiple files
-      const filePromises = droppedFiles.map(file => new Promise<FileRow>((resolve) => {
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          resolve({
-            id: crypto.randomUUID(),
-            questionFile: {
-              id: crypto.randomUUID(),
-              name: file.name,
-              type: 'question',
-              timestamp: Date.now(),
-              content: ev.target?.result as string
-            },
-            answerFile: null,
-            isCompleted: false,
-            order: Date.now()
-          });
-        };
-        // Fallback for reading failure or large files if needed, but for now standard read
-        reader.readAsDataURL(file);
-      }));
+  // Allow reorder only if viewing all files (no filtering active) for simplicity and data integrity
+  const canReorder = visibleFiles.length === topic.files.length;
 
-      Promise.all(filePromises).then(newFileRows => {
-         onUpdate({ files: [...topic.files, ...newFileRows] });
-      });
+  const processFiles = (files: File[]) => {
+      if (files.length > 0) {
+        const filePromises = files.map(file => new Promise<FileRow>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = async (ev) => {
+            const content = ev.target?.result as string;
+            const questionFileId = crypto.randomUUID();
+            
+            // Save to IDB
+            await saveFileContent(questionFileId, content);
+
+            resolve({
+              id: crypto.randomUUID(),
+              questionFile: {
+                id: questionFileId,
+                name: file.name,
+                type: 'question',
+                timestamp: Date.now(),
+                content: undefined
+              },
+              answerFile: null,
+              isCompleted: false,
+              order: Date.now()
+            });
+          };
+          reader.readAsDataURL(file);
+        }));
+
+        Promise.all(filePromises).then(newFileRows => {
+           onUpdate({ files: [...topic.files, ...newFileRows] });
+        });
+      }
+  };
+
+  const handleRowDragStart = (e: React.DragEvent, id: string) => {
+    e.dataTransfer.setData('rowId', id);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleRowDrop = (e: React.DragEvent, targetId: string) => {
+    const draggedId = e.dataTransfer.getData('rowId');
+    if (!draggedId || draggedId === targetId) return;
+
+    const fromIndex = topic.files.findIndex(f => f.id === draggedId);
+    const toIndex = topic.files.findIndex(f => f.id === targetId);
+
+    if (fromIndex !== -1 && toIndex !== -1) {
+      const newFiles = [...topic.files];
+      const [movedItem] = newFiles.splice(fromIndex, 1);
+      newFiles.splice(toIndex, 0, movedItem);
+      onUpdate({ files: newFiles });
     }
   };
 
-  const handlePaste = async () => {
-     try {
-      const text = await navigator.clipboard.readText();
-      if (text) {
-        const newRow: FileRow = {
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+        return;
+    }
+
+    e.preventDefault();
+
+    if (e.clipboardData.files && e.clipboardData.files.length > 0) {
+        processFiles(Array.from(e.clipboardData.files));
+        return;
+    }
+
+    const text = e.clipboardData.getData('text');
+    if (text) {
+         const newRow: FileRow = {
            id: crypto.randomUUID(),
            questionFile: {
              id: crypto.randomUUID(),
              name: text.substring(0, 50) + (text.length > 50 ? '...' : ''),
              type: 'question',
-             timestamp: Date.now()
+             timestamp: Date.now(),
+             content: undefined
            },
            answerFile: null,
            isCompleted: false,
            order: Date.now()
         };
         onUpdate({ files: [...topic.files, newRow]});
-      }
-     } catch (err) {
-       console.error("Paste failed", err);
-     }
-  }
+    }
+  };
 
   const addNewRow = () => {
     const newRow: FileRow = {
@@ -788,16 +970,9 @@ const TopicItem = ({
 
   return (
     <div 
-      className={`bg-white rounded-xl border transition-all duration-200 ${dragOver ? 'border-blue-400 ring-2 ring-blue-100 shadow-lg' : 'border-slate-200 shadow-sm'}`}
-      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-      onDragLeave={() => setDragOver(false)}
-      onDrop={handleFileDrop}
+      className={`bg-white rounded-xl border transition-all duration-200 border-slate-200 shadow-sm outline-none ring-offset-2 focus:ring-2 focus:ring-blue-100`}
       tabIndex={0}
-      onKeyDown={(e) => {
-        if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
-          handlePaste();
-        }
-      }}
+      onPaste={handlePaste}
     >
       {/* Topic Header */}
       <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50/30 rounded-t-xl group">
@@ -842,20 +1017,17 @@ const TopicItem = ({
       {/* Topic Content */}
       {!topic.isCollapsed && (
         <div className="p-4 bg-white rounded-b-xl">
-           {dragOver && (
-             <div className="absolute inset-0 bg-blue-50/90 flex flex-col items-center justify-center border-2 border-blue-500 border-dashed rounded-xl z-10">
-               <Upload size={48} className="text-blue-600 animate-bounce" />
-               <p className="font-bold text-blue-700 mt-2">Thả file vào đây để thêm nhanh</p>
-             </div>
-           )}
-
            <div className="space-y-1">
-             {visibleFiles.map((row) => (
+             {visibleFiles.map((row, index) => (
                <FileRowItem 
                  key={row.id} 
+                 index={index}
                  row={row} 
                  onUpdate={(updates) => updateRow(row.id, updates)}
                  onDelete={() => deleteRow(row.id)}
+                 onDragStart={handleRowDragStart}
+                 onDrop={handleRowDrop}
+                 isDraggable={canReorder}
                />
              ))}
              {visibleFiles.length === 0 && topic.files.length > 0 && (
@@ -878,8 +1050,10 @@ const TopicItem = ({
                  multiple 
                  className="hidden" 
                  onChange={(e) => {
-                    const evt = { preventDefault: () => {}, dataTransfer: { files: e.target.files } } as any;
-                    handleFileDrop(evt);
+                    if (e.target.files) {
+                        processFiles(Array.from(e.target.files));
+                    }
+                    e.target.value = '';
                  }}
                />
              </label>
