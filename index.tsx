@@ -3,7 +3,6 @@ import { createRoot } from 'react-dom/client';
 import { 
   Folder, 
   Plus, 
-  MoreVertical, 
   FileText, 
   CheckSquare, 
   Square, 
@@ -14,15 +13,11 @@ import {
   Search, 
   Filter, 
   Upload, 
-  Download, 
   GripVertical,
-  Palette,
   SortAsc,
   Clock,
-  Save,
   X,
   FileCheck,
-  FileX
 } from 'lucide-react';
 
 // --- Types & Interfaces ---
@@ -62,8 +57,8 @@ interface Shelf {
 
 // --- Constants ---
 const COLORS = [
-  'bg-slate-500', 'bg-blue-600', 'bg-emerald-600', 'bg-violet-600', 
-  'bg-amber-500', 'bg-rose-500', 'bg-cyan-600', 'bg-indigo-600'
+  'bg-slate-600', 'bg-blue-600', 'bg-emerald-600', 'bg-violet-600', 
+  'bg-amber-600', 'bg-rose-600', 'bg-cyan-600', 'bg-indigo-600'
 ];
 
 const DEFAULT_SHELF: Shelf = {
@@ -214,13 +209,13 @@ const Sidebar = ({
         <div className="flex gap-2">
            <button 
             onClick={() => setIsAdding(true)}
-            className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-medium transition-all shadow-sm shadow-blue-200"
+            className="flex-1 flex items-center justify-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 hover:border-blue-300 hover:text-blue-600 text-slate-600 py-2 rounded-xl text-sm font-bold transition-all shadow-sm"
           >
             <Plus size={16} /> Ngăn Mới
           </button>
           <button 
             onClick={() => setSortMode(sortMode === 'name' ? 'time' : 'name')}
-            className="p-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-500"
+            className="p-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:text-blue-600 text-slate-400 transition-colors"
             title={sortMode === 'name' ? 'Sắp xếp theo thời gian' : 'Sắp xếp theo tên'}
           >
             {sortMode === 'name' ? <SortAsc size={18} /> : <Clock size={18} />}
@@ -228,24 +223,24 @@ const Sidebar = ({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
         {isAdding && (
-          <div className="bg-blue-50 p-3 rounded-xl border border-blue-100 animate-in fade-in slide-in-from-left-4">
+          <div className="bg-white p-4 rounded-2xl shadow-lg border border-blue-100 animate-in fade-in zoom-in-95">
             <input 
               autoFocus
-              className="w-full bg-white border border-blue-200 rounded px-2 py-1 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
               placeholder="Nhập tên ngăn..."
               value={newName}
               onChange={e => setNewName(e.target.value)}
               onBlur={confirmAdd}
               onKeyDown={(e) => e.key === 'Enter' && confirmAdd()}
             />
-            <div className="flex gap-1 flex-wrap">
+            <div className="flex gap-2 flex-wrap">
               {COLORS.map(c => (
                 <button 
                   key={c}
                   onMouseDown={(e) => { e.preventDefault(); setSelectedColor(c); }} // prevent blur
-                  className={`w-5 h-5 rounded-full ${c} ${selectedColor === c ? 'ring-2 ring-offset-1 ring-slate-400 scale-110' : ''}`}
+                  className={`w-6 h-6 rounded-full cursor-pointer transition-transform ${c} ${selectedColor === c ? 'ring-2 ring-offset-2 ring-slate-400 scale-110' : 'hover:scale-110'}`}
                 />
               ))}
             </div>
@@ -256,40 +251,44 @@ const Sidebar = ({
           <div 
             key={shelf.id}
             onClick={() => onSelect(shelf.id)}
-            className={`group relative flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all ${
+            className={`group relative p-4 rounded-2xl cursor-pointer transition-all duration-200 ${
               activeShelfId === shelf.id 
-                ? 'bg-blue-50 border border-blue-100 shadow-sm' 
-                : 'hover:bg-slate-50 border border-transparent'
+                ? `${shelf.color} text-white shadow-md shadow-slate-300 scale-[1.02]` 
+                : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-100 hover:border-slate-200 hover:shadow-sm'
             }`}
           >
-            <div className={`w-3 h-10 rounded-full ${shelf.color} shadow-sm`}></div>
-            <div className="flex-1 min-w-0">
-              {editingId === shelf.id ? (
-                 <input 
-                  ref={inputRef}
-                  className="w-full bg-white border border-slate-300 rounded px-1 text-sm font-medium focus:outline-none focus:border-blue-500"
-                  value={shelf.name}
-                  onChange={(e) => onUpdateName(shelf.id, e.target.value)}
-                  onBlur={() => setEditingId(null)}
-                  onKeyDown={(e) => handleEditName(shelf.id, e)}
-                  autoFocus
-                  onClick={(e) => e.stopPropagation()}
-                 />
-              ) : (
-                <h3 className={`font-semibold text-sm truncate ${activeShelfId === shelf.id ? 'text-blue-800' : 'text-slate-700'}`}>
-                  {shelf.name}
-                </h3>
-              )}
-              <p className="text-xs text-slate-400 mt-0.5">{shelf.topics.length} chủ đề</p>
+            <div className="flex items-center gap-4">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${activeShelfId === shelf.id ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                 <Folder size={20} />
+              </div>
+              <div className="flex-1 min-w-0">
+                {editingId === shelf.id ? (
+                   <input 
+                    ref={inputRef}
+                    className="w-full bg-white/90 text-slate-800 rounded px-1 text-sm font-bold focus:outline-none shadow-sm"
+                    value={shelf.name}
+                    onChange={(e) => onUpdateName(shelf.id, e.target.value)}
+                    onBlur={() => setEditingId(null)}
+                    onKeyDown={(e) => handleEditName(shelf.id, e)}
+                    autoFocus
+                    onClick={(e) => e.stopPropagation()}
+                   />
+                ) : (
+                  <h3 className="font-bold text-sm truncate">{shelf.name}</h3>
+                )}
+                <p className={`text-xs mt-0.5 ${activeShelfId === shelf.id ? 'text-white/70' : 'text-slate-400'}`}>
+                  {shelf.topics.length} chủ đề
+                </p>
+              </div>
             </div>
-            
-            <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 flex gap-1 bg-white/80 p-1 rounded-lg backdrop-blur-sm transition-opacity shadow-sm">
-              <button onClick={(e) => { e.stopPropagation(); setEditingId(shelf.id); }} className="p-1.5 hover:bg-blue-100 text-slate-400 hover:text-blue-600 rounded">
-                <Edit2 size={12} />
-              </button>
-              <button onClick={(e) => { e.stopPropagation(); onDelete(shelf.id); }} className="p-1.5 hover:bg-red-100 text-slate-400 hover:text-red-600 rounded">
-                <Trash2 size={12} />
-              </button>
+
+            <div className={`absolute top-2 right-2 flex gap-1 transition-opacity ${activeShelfId === shelf.id ? 'opacity-0 group-hover:opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+               <button onClick={(e) => { e.stopPropagation(); setEditingId(shelf.id); }} className={`p-1.5 rounded-lg ${activeShelfId === shelf.id ? 'hover:bg-white/20 text-white' : 'hover:bg-slate-200 text-slate-400'}`}>
+                 <Edit2 size={14} />
+               </button>
+               <button onClick={(e) => { e.stopPropagation(); onDelete(shelf.id); }} className={`p-1.5 rounded-lg ${activeShelfId === shelf.id ? 'hover:bg-white/20 text-white' : 'hover:bg-red-100 hover:text-red-500 text-slate-400'}`}>
+                 <Trash2 size={14} />
+               </button>
             </div>
           </div>
         ))}
@@ -302,8 +301,12 @@ const Sidebar = ({
 
 const ShelfDetail = ({ shelf, onUpdate }: { shelf: Shelf, onUpdate: (s: Shelf) => void }) => {
   const [search, setSearch] = useState('');
-  const [filterMode, setFilterMode] = useState<string>('all'); // all, completed-topic, incomplete-topic, completed-file, incomplete-file, has-answer, no-answer
   
+  // New Filter States
+  const [filterTopic, setFilterTopic] = useState<'all' | 'completed' | 'incomplete'>('all');
+  const [filterFile, setFilterFile] = useState<'all' | 'completed' | 'incomplete'>('all');
+  const [filterAnswer, setFilterAnswer] = useState<'all' | 'has' | 'no'>('all');
+
   // Handlers for Topic Management
   const addTopic = () => {
     const newTopic: Topic = {
@@ -338,118 +341,331 @@ const ShelfDetail = ({ shelf, onUpdate }: { shelf: Shelf, onUpdate: (s: Shelf) =
     onUpdate({ ...shelf, topics: newTopics });
   };
 
-  // Filter Logic
-  const filteredTopics = useMemo(() => {
-    let result = [...shelf.topics];
-    
-    // Sort logic handled by user manually, but here we render based on order
-    // (Wait, user asked for manual sort of topics, we do that by array order in state)
+  // Filter Logic (Centralized)
+  const processedTopics = useMemo(() => {
+    return shelf.topics.map(topic => {
+      // 1. Filter Files inside Topic first
+      const visibleFiles = topic.files.filter(f => {
+        // Search Filter (Applies to file name or Answer file name)
+        const matchSearch = search ? (
+          f.questionFile?.name.toLowerCase().includes(search.toLowerCase()) || 
+          f.answerFile?.name.toLowerCase().includes(search.toLowerCase())
+        ) : true;
+        
+        // File Status Filter
+        const matchFileStatus = 
+          filterFile === 'all' ? true :
+          filterFile === 'completed' ? f.isCompleted :
+          !f.isCompleted;
 
-    // Filter Search
-    if (search) {
-      const lowerSearch = search.toLowerCase();
-      result = result.filter(t => 
-        t.name.toLowerCase().includes(lowerSearch) || 
-        t.files.some(f => f.questionFile?.name.toLowerCase().includes(lowerSearch) || f.answerFile?.name.toLowerCase().includes(lowerSearch))
-      );
-    }
+        // Answer Status Filter
+        const matchAnswerStatus = 
+          filterAnswer === 'all' ? true :
+          filterAnswer === 'has' ? !!f.answerFile :
+          !f.answerFile;
 
-    // Filter Mode
-    if (filterMode !== 'all') {
-      result = result.filter(t => {
-        const total = t.files.length;
-        const completed = t.files.filter(f => f.isCompleted).length;
-        const isTopicCompleted = total > 0 && total === completed;
-
-        switch (filterMode) {
-          case 'completed-topic': return isTopicCompleted;
-          case 'incomplete-topic': return !isTopicCompleted;
-          // For file filters, we filter the FILES inside the render, but we need to keep the topic if it has matching files
-          case 'completed-file': return t.files.some(f => f.isCompleted);
-          case 'incomplete-file': return t.files.some(f => !f.isCompleted);
-          case 'has-answer': return t.files.some(f => !!f.answerFile);
-          case 'no-answer': return t.files.some(f => !f.answerFile);
-          default: return true;
-        }
+        return matchSearch && matchFileStatus && matchAnswerStatus;
       });
-    }
 
-    return result;
-  }, [shelf.topics, search, filterMode]);
+      // 2. Check Topic Status (based on all files, not just visible ones, usually)
+      const total = topic.files.length;
+      const completed = topic.files.filter(f => f.isCompleted).length;
+      const isTopicCompleted = total > 0 && total === completed;
+
+      const matchTopicStatus = 
+          filterTopic === 'all' ? true :
+          filterTopic === 'completed' ? isTopicCompleted :
+          !isTopicCompleted;
+
+      // 3. Match Topic Name with Search
+      const matchTopicName = search ? topic.name.toLowerCase().includes(search.toLowerCase()) : false;
+
+      // Visibility Decision: 
+      // Show topic if:
+      // (TopicStatus matches) AND ( (Search matches TopicName) OR (Has visible matching files) )
+      // If Search is empty, matchTopicName is false, but we should show if has visible files (or just all if no file filters).
+      // Actually if search is empty, we show based on file filters.
+      
+      let shouldShow = matchTopicStatus;
+      if (shouldShow) {
+          if (search) {
+              // If searching, show if name matches OR has matching files
+              shouldShow = matchTopicName || visibleFiles.length > 0;
+          } else {
+              // If not searching, show if has matching files (if file filters are active)
+              // If file filters are 'all', visibleFiles is all files. 
+              // If topic has 0 files, and filters are all, show it? Yes.
+              // If file filters are set, and visibleFiles is 0, hide topic? Yes, usually.
+              if (filterFile !== 'all' || filterAnswer !== 'all') {
+                  shouldShow = visibleFiles.length > 0;
+              }
+          }
+      }
+
+      // If Topic Name matches search, we want to show ALL files that match status filters, 
+      // even if they don't match search text.
+      // Re-calculate visible files if Topic Name matches? 
+      // Let's stick to: "If topic name matches, show all files matching status filters"
+      let finalVisibleFiles = visibleFiles;
+      if (matchTopicName) {
+         finalVisibleFiles = topic.files.filter(f => {
+             const matchFileStatus = filterFile === 'all' ? true : filterFile === 'completed' ? f.isCompleted : !f.isCompleted;
+             const matchAnswerStatus = filterAnswer === 'all' ? true : filterAnswer === 'has' ? !!f.answerFile : !f.answerFile;
+             return matchFileStatus && matchAnswerStatus;
+         });
+      }
+
+      return {
+        ...topic,
+        visibleFiles: finalVisibleFiles,
+        shouldShow
+      };
+    }).filter(t => t.shouldShow);
+  }, [shelf.topics, search, filterTopic, filterFile, filterAnswer]);
 
   return (
     <div className="flex flex-col h-full bg-slate-50">
-      {/* Header */}
-      <div className="bg-white px-6 py-4 border-b border-slate-200 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between z-10">
-        <div className="flex items-center gap-3">
-          <div className={`w-2 h-8 rounded-full ${shelf.color}`}></div>
+      {/* Header with Search and Filters */}
+      <div className="bg-white px-6 py-4 border-b border-slate-200 shadow-sm z-10 space-y-4">
+        <div className="flex items-center gap-3 mb-2">
+          <div className={`w-2 h-6 rounded-full ${shelf.color}`}></div>
           <h2 className="text-xl font-bold text-slate-800">{shelf.name}</h2>
-          <span className="text-sm text-slate-400 bg-slate-100 px-2 py-1 rounded-full">{shelf.topics.length} chủ đề</span>
+          <span className="text-sm text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{shelf.topics.length} chủ đề</span>
         </div>
 
-        <div className="flex items-center gap-3 w-full md:w-auto">
-          <div className="relative flex-1 md:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-            <input 
-              type="text"
-              placeholder="Tìm kiếm file, chủ đề..."
-              className="w-full pl-10 pr-4 py-2 bg-slate-100 border-none rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          <div className="relative group">
-            <button className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 text-sm font-medium">
-              <Filter size={16} />
-              <span className="hidden sm:inline">Bộ Lọc</span>
-              <ChevronDown size={14} />
-            </button>
-            <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-100 py-2 hidden group-hover:block z-50">
-               <div className="px-3 py-2 text-xs font-bold text-slate-400 uppercase">Trạng Thái Chủ Đề</div>
-               <button onClick={() => setFilterMode('all')} className={`w-full text-left px-4 py-2 text-sm hover:bg-blue-50 ${filterMode === 'all' ? 'text-blue-600 font-bold' : 'text-slate-700'}`}>Tất cả</button>
-               <button onClick={() => setFilterMode('completed-topic')} className={`w-full text-left px-4 py-2 text-sm hover:bg-blue-50 ${filterMode === 'completed-topic' ? 'text-blue-600 font-bold' : 'text-slate-700'}`}>Chủ đề đã hoàn thành</button>
-               <button onClick={() => setFilterMode('incomplete-topic')} className={`w-full text-left px-4 py-2 text-sm hover:bg-blue-50 ${filterMode === 'incomplete-topic' ? 'text-blue-600 font-bold' : 'text-slate-700'}`}>Chủ đề chưa hoàn thành</button>
-               <div className="border-t border-slate-100 my-1"></div>
-               <div className="px-3 py-2 text-xs font-bold text-slate-400 uppercase">Trạng Thái File</div>
-               <button onClick={() => setFilterMode('completed-file')} className={`w-full text-left px-4 py-2 text-sm hover:bg-blue-50 ${filterMode === 'completed-file' ? 'text-blue-600 font-bold' : 'text-slate-700'}`}>File đã xong</button>
-               <button onClick={() => setFilterMode('incomplete-file')} className={`w-full text-left px-4 py-2 text-sm hover:bg-blue-50 ${filterMode === 'incomplete-file' ? 'text-blue-600 font-bold' : 'text-slate-700'}`}>File chưa xong</button>
-               <button onClick={() => setFilterMode('has-answer')} className={`w-full text-left px-4 py-2 text-sm hover:bg-blue-50 ${filterMode === 'has-answer' ? 'text-blue-600 font-bold' : 'text-slate-700'}`}>Đã có đáp án</button>
-               <button onClick={() => setFilterMode('no-answer')} className={`w-full text-left px-4 py-2 text-sm hover:bg-blue-50 ${filterMode === 'no-answer' ? 'text-blue-600 font-bold' : 'text-slate-700'}`}>Chưa có đáp án</button>
-            </div>
-          </div>
+        {/* Filter Bar */}
+        <div className="flex flex-col lg:flex-row items-center bg-slate-50 border border-slate-200 rounded-lg p-1 gap-2 lg:gap-0">
+           {/* Search Input */}
+           <div className="flex-1 flex items-center px-3 gap-2 w-full">
+              <Search size={18} className="text-slate-400 shrink-0" />
+              <input 
+                type="text" 
+                placeholder="Tìm kiếm file hoặc chủ đề..." 
+                className="w-full bg-transparent border-none focus:ring-0 text-sm text-slate-700 py-2 placeholder-slate-400 outline-none"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+           </div>
+
+           {/* Divider */}
+           <div className="hidden lg:block w-px h-6 bg-slate-300 mx-2"></div>
+
+           {/* Filters */}
+           <div className="flex flex-wrap items-center gap-4 px-3 w-full lg:w-auto justify-end">
+              {/* Topic Filter */}
+              <div className="flex items-center gap-2">
+                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Chủ đề:</span>
+                 <select 
+                  className="bg-transparent text-sm font-semibold text-slate-700 focus:outline-none cursor-pointer hover:text-blue-600"
+                  value={filterTopic}
+                  onChange={(e) => setFilterTopic(e.target.value as any)}
+                 >
+                   <option value="all">Tất cả</option>
+                   <option value="completed">Hoàn thành</option>
+                   <option value="incomplete">Chưa xong</option>
+                 </select>
+              </div>
+
+              <div className="w-px h-4 bg-slate-300 hidden sm:block"></div>
+
+              {/* File Filter */}
+              <div className="flex items-center gap-2">
+                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">File:</span>
+                 <select 
+                  className="bg-transparent text-sm font-semibold text-slate-700 focus:outline-none cursor-pointer hover:text-blue-600"
+                  value={filterFile}
+                  onChange={(e) => setFilterFile(e.target.value as any)}
+                 >
+                   <option value="all">Tất cả</option>
+                   <option value="completed">Hoàn thành</option>
+                   <option value="incomplete">Chưa xong</option>
+                 </select>
+              </div>
+
+              <div className="w-px h-4 bg-slate-300 hidden sm:block"></div>
+
+              {/* Answer Filter */}
+              <div className="flex items-center gap-2">
+                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Đáp án:</span>
+                 <select 
+                  className="bg-transparent text-sm font-semibold text-slate-700 focus:outline-none cursor-pointer hover:text-blue-600"
+                  value={filterAnswer}
+                  onChange={(e) => setFilterAnswer(e.target.value as any)}
+                 >
+                   <option value="all">Tất cả</option>
+                   <option value="has">Có đáp án</option>
+                   <option value="no">Chưa có</option>
+                 </select>
+              </div>
+           </div>
         </div>
       </div>
 
       {/* Topics Container */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6 scroll-smooth custom-scrollbar">
-        {filteredTopics.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 text-slate-400 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
+      <div className="flex-1 overflow-y-auto p-6 space-y-6 scroll-smooth custom-scrollbar bg-slate-50/50">
+        {processedTopics.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-64 text-slate-400 border-2 border-dashed border-slate-200 rounded-2xl bg-white/50">
              <Search size={48} className="mb-4 opacity-20" />
-             <p>Chưa có chủ đề nào hoặc không tìm thấy kết quả.</p>
-             <button onClick={addTopic} className="mt-4 text-blue-600 font-semibold hover:underline">Thêm chủ đề mới ngay</button>
+             <p>Không tìm thấy kết quả phù hợp.</p>
+             {(search || filterTopic !== 'all' || filterFile !== 'all') && (
+               <button 
+                onClick={() => { setSearch(''); setFilterTopic('all'); setFilterFile('all'); setFilterAnswer('all'); }} 
+                className="mt-2 text-blue-600 font-medium hover:underline text-sm"
+               >
+                 Xóa bộ lọc
+               </button>
+             )}
           </div>
         ) : (
-          filteredTopics.map((topic, index) => (
+          processedTopics.map((item, index) => (
             <TopicItem 
-              key={topic.id} 
-              topic={topic} 
-              onUpdate={(updates) => updateTopic(topic.id, updates)}
-              onDelete={() => deleteTopic(topic.id)}
+              key={item.id} 
+              topic={item} // We pass the item which contains 'visibleFiles'
+              visibleFiles={item.visibleFiles} // Explicitly pass visible files
+              onUpdate={(updates) => updateTopic(item.id, updates)}
+              onDelete={() => deleteTopic(item.id)}
               onMoveUp={() => moveTopic(index, 'up')}
               onMoveDown={() => moveTopic(index, 'down')}
-              filterMode={filterMode}
             />
           ))
         )}
 
-        <button 
-          onClick={addTopic}
-          className="w-full py-4 border-2 border-dashed border-blue-200 rounded-xl text-blue-500 font-semibold hover:bg-blue-50 hover:border-blue-300 transition-all flex items-center justify-center gap-2"
-        >
-          <Plus size={24} /> Thêm Chủ Đề Mới
-        </button>
-        <div className="h-20"></div> {/* Bottom spacer */}
+        {/* Add Topic Button - Only show if not searching/filtering heavily or always show at bottom? 
+            Let's keep it visible so user can always add. */}
+        {!search && filterTopic === 'all' && (
+           <button 
+            onClick={addTopic}
+            className="w-full py-4 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 font-semibold hover:bg-white hover:border-blue-300 hover:text-blue-500 transition-all flex items-center justify-center gap-2"
+          >
+            <Plus size={24} /> Thêm Chủ Đề Mới
+          </button>
+        )}
+        <div className="h-20"></div>
       </div>
+    </div>
+  );
+};
+
+// --- Single File Row Component ---
+
+const FileSlot = ({ 
+  file, placeholder, icon, isAnswer, onUpload, onRemove 
+}: { 
+  file: FileMeta | null, 
+  placeholder: string, 
+  icon: React.ReactNode,
+  isAnswer?: boolean,
+  onUpload: (f: File) => void,
+  onRemove: () => void
+}) => {
+  const [dragOver, setDragOver] = useState(false);
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    if (e.dataTransfer.files?.[0]) {
+      onUpload(e.dataTransfer.files[0]);
+    }
+  };
+
+  if (file) {
+    return (
+      <div className={`flex items-center gap-2 p-2 rounded-lg border text-sm ${isAnswer ? 'bg-emerald-50 border-emerald-100 text-emerald-800' : 'bg-blue-50 border-blue-100 text-blue-800'}`}>
+        <span className="opacity-70">{icon}</span>
+        <span className="truncate font-medium flex-1" title={file.name}>{file.name}</span>
+        {file.size && <span className="text-[10px] opacity-60 shrink-0">{file.size}</span>}
+        <button 
+          onClick={(e) => { e.stopPropagation(); onRemove(); }}
+          className="p-1 hover:bg-black/10 rounded-full transition-colors"
+        >
+          <X size={12} />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <label 
+      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={handleDrop}
+      className={`flex items-center gap-2 p-2 rounded-lg border-2 border-dashed cursor-pointer transition-all h-[38px] ${dragOver ? 'border-blue-400 bg-blue-50' : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50 text-slate-400'}`}
+    >
+      <input type="file" className="hidden" onChange={(e) => e.target.files?.[0] && onUpload(e.target.files[0])} />
+      <span className="opacity-50">{icon}</span>
+      <span className="text-xs font-medium">{placeholder}</span>
+    </label>
+  );
+};
+
+const FileRowItem = ({ 
+  row, onUpdate, onDelete 
+}: { 
+  row: FileRow, 
+  onUpdate: (updates: Partial<FileRow>) => void, 
+  onDelete: () => void 
+}) => {
+  
+  const handleFileUpload = (type: 'question' | 'answer', file: File) => {
+    const fileMeta: FileMeta = {
+      id: crypto.randomUUID(),
+      name: file.name,
+      size: (file.size / 1024).toFixed(1) + ' KB',
+      type,
+      timestamp: Date.now()
+    };
+    
+    if (type === 'question') onUpdate({ questionFile: fileMeta });
+    else onUpdate({ answerFile: fileMeta });
+  };
+
+  return (
+    <div className={`group flex items-center gap-3 p-3 rounded-lg border transition-all ${row.isCompleted ? 'bg-slate-50 border-slate-100 opacity-75' : 'bg-white border-slate-200 hover:border-blue-300'}`}>
+      
+      {/* Checkbox */}
+      <button 
+        onClick={() => onUpdate({ isCompleted: !row.isCompleted })}
+        className={`shrink-0 transition-colors ${row.isCompleted ? 'text-emerald-500' : 'text-slate-300 hover:text-blue-500'}`}
+      >
+        {row.isCompleted ? <CheckSquare size={20} /> : <Square size={20} />}
+      </button>
+
+      {/* Question File Slot */}
+      <div className="flex-1 min-w-0">
+        <FileSlot 
+          file={row.questionFile} 
+          placeholder="Đề bài" 
+          icon={<FileText size={16} />}
+          onUpload={(f) => handleFileUpload('question', f)}
+          onRemove={() => onUpdate({ questionFile: null })}
+        />
+      </div>
+
+      {/* Arrow Divider */}
+      <div className="text-slate-300">
+        <ChevronRight size={16} />
+      </div>
+
+      {/* Answer File Slot */}
+      <div className="flex-1 min-w-0">
+         <FileSlot 
+          file={row.answerFile} 
+          placeholder="Đáp án" 
+          icon={<FileCheck size={16} />}
+          isAnswer
+          onUpload={(f) => handleFileUpload('answer', f)}
+          onRemove={() => onUpdate({ answerFile: null })}
+        />
+      </div>
+
+      {/* Actions */}
+      <button 
+        onClick={onDelete}
+        className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100 transition-all"
+        title="Xóa dòng"
+      >
+        <Trash2 size={16} />
+      </button>
     </div>
   );
 };
@@ -457,34 +673,22 @@ const ShelfDetail = ({ shelf, onUpdate }: { shelf: Shelf, onUpdate: (s: Shelf) =
 // --- Single Topic Component ---
 
 const TopicItem = ({ 
-  topic, onUpdate, onDelete, onMoveUp, onMoveDown, filterMode 
+  topic, visibleFiles, onUpdate, onDelete, onMoveUp, onMoveDown
 }: { 
   topic: Topic, 
+  visibleFiles: FileRow[], // Received from parent
   onUpdate: (u: Partial<Topic>) => void, 
   onDelete: () => void,
   onMoveUp: () => void,
   onMoveDown: () => void,
-  filterMode: string
 }) => {
   const [isEditingName, setIsEditingName] = useState(false);
   const [dragOver, setDragOver] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Stats
+  // Stats - Calculate based on ALL files in topic, not just visible ones (usually stats reflect the real topic state)
   const totalFiles = topic.files.length;
   const completedFiles = topic.files.filter(f => f.isCompleted).length;
   const percent = totalFiles === 0 ? 0 : Math.round((completedFiles / totalFiles) * 100);
-
-  // Filter Logic for Files Display
-  const visibleFiles = topic.files.filter(f => {
-    switch (filterMode) {
-      case 'completed-file': return f.isCompleted;
-      case 'incomplete-file': return !f.isCompleted;
-      case 'has-answer': return !!f.answerFile;
-      case 'no-answer': return !f.answerFile;
-      default: return true;
-    }
-  });
 
   const handleFileDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -514,7 +718,6 @@ const TopicItem = ({
      try {
       const text = await navigator.clipboard.readText();
       if (text) {
-        // Simple paste as a new file row with name
         const newRow: FileRow = {
            id: crypto.randomUUID(),
            questionFile: {
@@ -599,9 +802,10 @@ const TopicItem = ({
             ) : (
               <div className="flex items-center gap-3 cursor-pointer" onClick={() => setIsEditingName(true)}>
                 <h3 className="font-bold text-lg text-slate-800">{topic.name}</h3>
-                <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-1 rounded border border-blue-100">
-                  {completedFiles}/{totalFiles} • {percent}%
+                <span className={`text-xs font-bold px-2 py-1 rounded border ${percent === 100 ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
+                  {percent}%
                 </span>
+                <span className="text-xs text-slate-400 font-normal">({completedFiles}/{totalFiles})</span>
               </div>
             )}
           </div>
@@ -634,8 +838,12 @@ const TopicItem = ({
                  onDelete={() => deleteRow(row.id)}
                />
              ))}
+             {visibleFiles.length === 0 && topic.files.length > 0 && (
+                <p className="text-center text-slate-400 text-sm py-4 italic">Các file trong chủ đề này đã bị ẩn bởi bộ lọc.</p>
+             )}
            </div>
 
+           {/* Show add buttons only if we are seeing all files or to allow adding even when filtered (UX choice: usually allow adding) */}
            <div className="mt-4 flex gap-3">
              <button 
                onClick={addNewRow}
@@ -662,117 +870,9 @@ const TopicItem = ({
   );
 };
 
-// --- File Row Item ---
-
-const FileRowItem = ({ 
-  row, onUpdate, onDelete 
-}: { 
-  row: FileRow, 
-  onUpdate: (u: Partial<FileRow>) => void, 
-  onDelete: () => void 
-}) => {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const answerInputRef = useRef<HTMLInputElement>(null);
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'question' | 'answer') => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      const meta: FileMeta = {
-        id: crypto.randomUUID(),
-        name: file.name,
-        size: (file.size / 1024).toFixed(1) + ' KB',
-        type,
-        timestamp: Date.now()
-      };
-      
-      if (type === 'question') onUpdate({ questionFile: meta });
-      else onUpdate({ answerFile: meta });
-    }
-  };
-
-  return (
-    <div 
-      className="flex flex-col md:flex-row md:items-center gap-4 p-3 hover:bg-slate-50 rounded-lg border border-transparent hover:border-slate-200 group transition-all"
-      draggable
-      onDragStart={(e) => e.dataTransfer.setData('rowId', row.id)}
-    >
-      <div className="cursor-move text-slate-300 hover:text-slate-500 hidden md:block">
-        <GripVertical size={16} />
-      </div>
-
-      {/* Question File Area */}
-      <div className="flex-1 min-w-0 flex items-center gap-3">
-        {row.questionFile ? (
-          <div className="flex items-center gap-2 bg-blue-50 px-3 py-2 rounded-lg border border-blue-100 max-w-full">
-            <div className="bg-blue-200 p-1.5 rounded text-blue-700">
-              <FileText size={16} />
-            </div>
-            <div className="min-w-0">
-               <p className="text-sm font-medium text-blue-900 truncate max-w-[200px] lg:max-w-[300px]" title={row.questionFile.name}>{row.questionFile.name}</p>
-            </div>
-            <button onClick={() => onUpdate({ questionFile: null })} className="text-blue-400 hover:text-red-500 ml-2"><X size={14}/></button>
-          </div>
-        ) : (
-          <div 
-            onClick={() => fileInputRef.current?.click()}
-            className="flex-1 border-2 border-dashed border-slate-200 rounded-lg h-10 flex items-center px-3 text-slate-400 text-sm hover:border-blue-300 hover:bg-blue-50/50 hover:text-blue-500 cursor-pointer transition-colors"
-          >
-            <Plus size={14} className="mr-2" /> Thêm file đề bài...
-          </div>
-        )}
-        <input ref={fileInputRef} type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'question')} />
-      </div>
-
-      <div className="hidden md:block text-slate-300">
-         <ChevronRight size={16} />
-      </div>
-
-      {/* Answer File Area */}
-      <div className="flex-1 min-w-0 flex items-center gap-3">
-         {row.answerFile ? (
-          <div className="flex items-center gap-2 bg-emerald-50 px-3 py-2 rounded-lg border border-emerald-100 max-w-full">
-            <div className="bg-emerald-200 p-1.5 rounded text-emerald-700">
-              <FileCheck size={16} />
-            </div>
-            <div className="min-w-0">
-               <p className="text-sm font-medium text-emerald-900 truncate max-w-[200px] lg:max-w-[300px]" title={row.answerFile.name}>{row.answerFile.name}</p>
-            </div>
-            <button onClick={() => onUpdate({ answerFile: null })} className="text-emerald-400 hover:text-red-500 ml-2"><X size={14}/></button>
-          </div>
-        ) : (
-          <div 
-            onClick={() => answerInputRef.current?.click()}
-            className="flex-1 border-2 border-dashed border-slate-200 rounded-lg h-10 flex items-center px-3 text-slate-400 text-sm hover:border-emerald-300 hover:bg-emerald-50/50 hover:text-emerald-500 cursor-pointer transition-colors"
-          >
-            <Plus size={14} className="mr-2" /> Thêm đáp án...
-          </div>
-        )}
-        <input ref={answerInputRef} type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'answer')} />
-      </div>
-
-      {/* Status & Actions */}
-      <div className="flex items-center gap-4 pl-4 md:border-l border-slate-100 min-w-[150px] justify-end">
-        <div 
-          onClick={() => onUpdate({ isCompleted: !row.isCompleted })}
-          className={`flex items-center gap-2 cursor-pointer select-none px-3 py-1.5 rounded-full transition-colors ${
-            row.isCompleted ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-          }`}
-        >
-          {row.isCompleted ? <CheckSquare size={18} /> : <Square size={18} />}
-          <span className="text-sm font-medium">{row.isCompleted ? 'Hoàn thành' : 'Chưa xong'}</span>
-        </div>
-        
-        <button 
-          onClick={onDelete}
-          className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-          title="Xóa dòng này"
-        >
-          <Trash2 size={16} />
-        </button>
-      </div>
-    </div>
-  );
-};
-
-const root = createRoot(document.getElementById('root')!);
-root.render(<App />);
+// Initialize App
+const rootElement = document.getElementById('root');
+if (rootElement) {
+  const root = createRoot(rootElement);
+  root.render(<App />);
+}
