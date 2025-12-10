@@ -18,6 +18,7 @@ import {
   Clock,
   X,
   FileCheck,
+  Download
 } from 'lucide-react';
 
 // --- Types & Interfaces ---
@@ -25,9 +26,10 @@ import {
 interface FileMeta {
   id: string;
   name: string;
-  size?: string;
+  // size?: string; // Removed size per request
   type: 'question' | 'answer';
   timestamp: number;
+  content?: string; // Base64 content for download
 }
 
 interface FileRow {
@@ -77,7 +79,7 @@ const saveToStorage = (data: Shelf[]) => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   } catch (e) {
     console.error("Storage quota exceeded", e);
-    alert("Cảnh báo: Bộ nhớ trình duyệt đã đầy. Một số file có thể không được lưu.");
+    // Don't alert constantly, maybe just log or show a toast if we had one
   }
 };
 
@@ -137,7 +139,7 @@ const App = () => {
   };
 
   return (
-    <div className="flex h-screen bg-slate-50 text-slate-800 font-sans overflow-hidden">
+    <div className="flex h-screen bg-slate-50 text-slate-800 overflow-hidden" style={{ fontFamily: "'Be Vietnam Pro', sans-serif" }}>
       <Sidebar 
         shelves={shelves} 
         activeShelfId={activeShelfId} 
@@ -380,32 +382,19 @@ const ShelfDetail = ({ shelf, onUpdate }: { shelf: Shelf, onUpdate: (s: Shelf) =
       // 3. Match Topic Name with Search
       const matchTopicName = search ? topic.name.toLowerCase().includes(search.toLowerCase()) : false;
 
-      // Visibility Decision: 
-      // Show topic if:
-      // (TopicStatus matches) AND ( (Search matches TopicName) OR (Has visible matching files) )
-      // If Search is empty, matchTopicName is false, but we should show if has visible files (or just all if no file filters).
-      // Actually if search is empty, we show based on file filters.
-      
+      // Visibility Decision
       let shouldShow = matchTopicStatus;
       if (shouldShow) {
           if (search) {
               // If searching, show if name matches OR has matching files
               shouldShow = matchTopicName || visibleFiles.length > 0;
           } else {
-              // If not searching, show if has matching files (if file filters are active)
-              // If file filters are 'all', visibleFiles is all files. 
-              // If topic has 0 files, and filters are all, show it? Yes.
-              // If file filters are set, and visibleFiles is 0, hide topic? Yes, usually.
               if (filterFile !== 'all' || filterAnswer !== 'all') {
                   shouldShow = visibleFiles.length > 0;
               }
           }
       }
 
-      // If Topic Name matches search, we want to show ALL files that match status filters, 
-      // even if they don't match search text.
-      // Re-calculate visible files if Topic Name matches? 
-      // Let's stick to: "If topic name matches, show all files matching status filters"
       let finalVisibleFiles = visibleFiles;
       if (matchTopicName) {
          finalVisibleFiles = topic.files.filter(f => {
@@ -520,8 +509,8 @@ const ShelfDetail = ({ shelf, onUpdate }: { shelf: Shelf, onUpdate: (s: Shelf) =
           processedTopics.map((item, index) => (
             <TopicItem 
               key={item.id} 
-              topic={item} // We pass the item which contains 'visibleFiles'
-              visibleFiles={item.visibleFiles} // Explicitly pass visible files
+              topic={item} 
+              visibleFiles={item.visibleFiles}
               onUpdate={(updates) => updateTopic(item.id, updates)}
               onDelete={() => deleteTopic(item.id)}
               onMoveUp={() => moveTopic(index, 'up')}
@@ -530,8 +519,6 @@ const ShelfDetail = ({ shelf, onUpdate }: { shelf: Shelf, onUpdate: (s: Shelf) =
           ))
         )}
 
-        {/* Add Topic Button - Only show if not searching/filtering heavily or always show at bottom? 
-            Let's keep it visible so user can always add. */}
         {!search && filterTopic === 'all' && (
            <button 
             onClick={addTopic}
@@ -568,12 +555,29 @@ const FileSlot = ({
     }
   };
 
+  const handleDownload = (e: React.MouseEvent) => {
+    if (!file || !file.content) {
+      if (file) alert("File này không có nội dung để tải (có thể do phiên làm việc trước chưa lưu nội dung).");
+      return;
+    }
+    const link = document.createElement('a');
+    link.href = file.content;
+    link.download = file.name;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   if (file) {
     return (
-      <div className={`flex items-center gap-2 p-2 rounded-lg border text-sm ${isAnswer ? 'bg-emerald-50 border-emerald-100 text-emerald-800' : 'bg-blue-50 border-blue-100 text-blue-800'}`}>
+      <div 
+        onClick={handleDownload}
+        className={`flex items-center gap-2 p-2 rounded-lg border text-sm cursor-pointer transition-all hover:shadow-md ${isAnswer ? 'bg-emerald-50 border-emerald-100 text-emerald-800 hover:bg-emerald-100' : 'bg-blue-50 border-blue-100 text-blue-800 hover:bg-blue-100'}`}
+        title="Nhấn để tải file"
+      >
         <span className="opacity-70">{icon}</span>
-        <span className="truncate font-medium flex-1" title={file.name}>{file.name}</span>
-        {file.size && <span className="text-[10px] opacity-60 shrink-0">{file.size}</span>}
+        <span className="truncate font-medium flex-1">{file.name}</span>
+        {/* Size removed per request */}
         <button 
           onClick={(e) => { e.stopPropagation(); onRemove(); }}
           className="p-1 hover:bg-black/10 rounded-full transition-colors"
@@ -607,16 +611,22 @@ const FileRowItem = ({
 }) => {
   
   const handleFileUpload = (type: 'question' | 'answer', file: File) => {
-    const fileMeta: FileMeta = {
-      id: crypto.randomUUID(),
-      name: file.name,
-      size: (file.size / 1024).toFixed(1) + ' KB',
-      type,
-      timestamp: Date.now()
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target?.result as string;
+      const fileMeta: FileMeta = {
+        id: crypto.randomUUID(),
+        name: file.name,
+        // size: (file.size / 1024).toFixed(1) + ' KB', // Removed
+        type,
+        timestamp: Date.now(),
+        content: content
+      };
+      
+      if (type === 'question') onUpdate({ questionFile: fileMeta });
+      else onUpdate({ answerFile: fileMeta });
     };
-    
-    if (type === 'question') onUpdate({ questionFile: fileMeta });
-    else onUpdate({ answerFile: fileMeta });
+    reader.readAsDataURL(file);
   };
 
   return (
@@ -676,7 +686,7 @@ const TopicItem = ({
   topic, visibleFiles, onUpdate, onDelete, onMoveUp, onMoveDown
 }: { 
   topic: Topic, 
-  visibleFiles: FileRow[], // Received from parent
+  visibleFiles: FileRow[], 
   onUpdate: (u: Partial<Topic>) => void, 
   onDelete: () => void,
   onMoveUp: () => void,
@@ -685,7 +695,6 @@ const TopicItem = ({
   const [isEditingName, setIsEditingName] = useState(false);
   const [dragOver, setDragOver] = useState(false);
 
-  // Stats - Calculate based on ALL files in topic, not just visible ones (usually stats reflect the real topic state)
   const totalFiles = topic.files.length;
   const completedFiles = topic.files.filter(f => f.isCompleted).length;
   const percent = totalFiles === 0 ? 0 : Math.round((completedFiles / totalFiles) * 100);
@@ -696,21 +705,32 @@ const TopicItem = ({
     
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const droppedFiles = Array.from(e.dataTransfer.files);
-      const newFileRows: FileRow[] = droppedFiles.map((file) => ({
-        id: crypto.randomUUID(),
-        questionFile: {
-          id: crypto.randomUUID(),
-          name: file.name,
-          size: (file.size / 1024).toFixed(1) + ' KB',
-          type: 'question',
-          timestamp: Date.now()
-        },
-        answerFile: null,
-        isCompleted: false,
-        order: Date.now()
+      
+      // Async read of multiple files
+      const filePromises = droppedFiles.map(file => new Promise<FileRow>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          resolve({
+            id: crypto.randomUUID(),
+            questionFile: {
+              id: crypto.randomUUID(),
+              name: file.name,
+              type: 'question',
+              timestamp: Date.now(),
+              content: ev.target?.result as string
+            },
+            answerFile: null,
+            isCompleted: false,
+            order: Date.now()
+          });
+        };
+        // Fallback for reading failure or large files if needed, but for now standard read
+        reader.readAsDataURL(file);
       }));
 
-      onUpdate({ files: [...topic.files, ...newFileRows] });
+      Promise.all(filePromises).then(newFileRows => {
+         onUpdate({ files: [...topic.files, ...newFileRows] });
+      });
     }
   };
 
